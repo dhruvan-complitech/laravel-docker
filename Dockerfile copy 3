@@ -1,0 +1,35 @@
+FROM php:7.2-apache
+
+RUN apt-get update && apt-get install -y \
+    sudo \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libzip-dev \
+    git \
+    zip \
+    unzip \
+    && docker-php-ext-configure gd --with-gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ --with-png-dir=/usr/include/ \
+    && docker-php-ext-install -j$(nproc) gd \
+    && docker-php-ext-install zip pdo pdo_mysql opcache \
+    && apt-get clean 
+
+RUN rm /etc/localtime
+RUN ln -s /usr/share/zoneinfo/Europe/Paris /etc/localtime
+RUN "date"
+
+RUN sed -ri -e 's!/var/www/html!/var/www!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!/var/www!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+COPY php/php.ini /usr/local/etc/php/conf.d/php.ini
+COPY apache/app.conf /etc/apache2/sites-available/000-default.conf
+#COPY apache/apache.conf /etc/apache2/apache2.conf
+
+RUN groupadd dev -g 1000
+RUN useradd dev -g dev -d /home/dev -m
+RUN echo '%dev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER dev:dev
+
+COPY . .
+
+CMD ["sudo", "/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
